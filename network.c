@@ -136,7 +136,7 @@ int net_process_send(struct net_endpoint *endp)
                 endp->send_queue_count * sizeof(*endp->send_queue));
     }
 
-    if (err < 0 && err != EWOULDBLOCK && err != EAGAIN) {
+    if (err < 0 && err != -EWOULDBLOCK && err != -EAGAIN) {
         /* An error. */
         return err;
     }
@@ -214,7 +214,7 @@ int net_process_receive(struct net_endpoint *endp)
         }
     }
 
-    if (err == -1 && errno != EWOULDBLOCK && errno != EAGAIN) {
+    if (err == -1 && err != -EWOULDBLOCK && err != -EAGAIN) {
         return -1;
     }
 
