@@ -88,7 +88,7 @@ void net_message_set_body_length(struct net_message *msg, unsigned len)
  *         a negative errno value indicating failure.
  */
 static int net_process_one_send(
-        struct net_endpoint *node,
+        struct net_endpoint *endp,
         struct net_message *msg,
         unsigned *num_sent)
 {
@@ -98,7 +98,7 @@ static int net_process_one_send(
     msg_len = net_message_length(msg);
 
     while (*num_sent < msg_len) {
-        n = send(node->fd, msg->data + *num_sent, msg_len - *num_sent, 0);
+        n = send(endp->fd, msg->data + *num_sent, msg_len - *num_sent, 0);
         if (n <= 0) {
             break;
         }
