@@ -189,36 +189,35 @@ static int net_process_one_receive(
 
 int net_process_receive(struct net_endpoint *endp)
 {
-    /* TODO: Finish this function. */
-    struct message *msg;
     int err = 0;
 
-    /* Get receive buffer. */
-    msg = endp->receive_msg;
-    if (!msg) {
-        msg = endp->receive_msg = net_message_new();
-        if (!msg) {
-            return -ENOMEM;
-        }
-    }
+    while (end->receive_queue_count < NET_ENDP_RECEIVE_QUEUE_SIZE) {
+        /* Get receive buffer. */
+        if (!endp->receive_msg) {
+            endp->receive_msg = net_message_new();
 
-    while (1) {
-        err = net_process_one_receive(endp, msg, &endp->num_bytes_received);
-        if (err > 0) {
-            /* Message received fully. */
-            net_message_unref(msg);
-            endp->num_bytes_received = 0;
+            if (!endp->receive_msg) {
+                return -ENOMEM;
+            }
         }
-        else {
+
+        err = net_process_one_receive(endp, endp->receive_msg,
+                &endp->num_bytes_received);
+        if (err <= 0) {
             break;
         }
+
+        /* Message received fully. */
+        endp->receive_queue[endp->receive_queue_count++] = endp->receive_msg;
+        endp->receive_msg = NULL;
+        endp->num_bytes_received = 0;
     }
 
-    if (err == -1 && err != -EWOULDBLOCK && err != -EAGAIN) {
-        return -1;
+    if (err <= 0 && err != -EWOULDBLOCK && err != -EAGAIN) {
+        return err;
     }
 
-    return err;
+    return 1;
 }
 
 struct net_message *net_receive(struct net_endpoint *endpoint)

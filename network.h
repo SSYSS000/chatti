@@ -73,7 +73,7 @@ void net_message_set_body_length(struct net_message *msg, unsigned len);
 int net_enqueue_message(struct net_endpoint *endpoint, struct net_message *msg);
 
 /**
- * @brief Send as much queued data as possible to an endpoint.
+ * @brief Send as much queued data as possible to an endpoint without blocking.
  *
  * @param endpoint Endpoint.
  *
@@ -81,16 +81,16 @@ int net_enqueue_message(struct net_endpoint *endpoint, struct net_message *msg);
  */
 int net_process_send(struct net_endpoint *endpoint);
 
-
 /**
- * @brief 
+ * @brief Receive as much message data as possible to a queue without blocking.
  *
- * @param endpoint
+ * @param endpoint Endpoint.
  *
- * @return 
+ * @return Positive integer indicating success,
+ *         zero indicating endpoint has shutdown,
+ *         a negative errno value indicating failure.
  */
 int net_process_receive(struct net_endpoint *endpoint);
-
 
 /**
  * @brief Get a network message from the receive queue.
