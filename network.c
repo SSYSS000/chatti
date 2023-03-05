@@ -117,7 +117,7 @@ int net_process_send(struct net_endpoint *endp)
 
     for (n_processed = 0; n_processed < endp->send_queue_count; ++n_processed) {
         msg = endp->send_queue[n_processed];
-        err = net_process_one_send(endpoint, msg, &endp->num_bytes_sent);
+        err = net_process_one_send(endp, msg, &endp->num_bytes_sent);
 
         if (err == 0) { 
             /* Message sent fully. */
@@ -141,7 +141,7 @@ int net_process_send(struct net_endpoint *endp)
         return err;
     }
 
-    return endpoint->send_queue_count;
+    return endp->send_queue_count;
 }
 
 /**
@@ -169,7 +169,7 @@ static int net_process_one_receive(
         needed = NET_MSG_HEADER_LEN;
     }
     else {
-        needed = net_message_len(msg);
+        needed = net_message_length(msg);
     }
 
     while (*num_received < needed) {
@@ -180,7 +180,7 @@ static int net_process_one_receive(
         *num_received += n;
 
         if (*num_received == NET_MSG_HEADER_LEN) {
-            needed = net_message_len(msg);
+            needed = net_message_length(msg);
         }
     }
 
@@ -191,7 +191,7 @@ int net_process_receive(struct net_endpoint *endp)
 {
     int err = 0;
 
-    while (end->receive_queue_count < NET_ENDP_RECEIVE_QUEUE_SIZE) {
+    while (endp->receive_queue_count < NET_ENDP_RECEIVE_QUEUE_SIZE) {
         /* Get receive buffer. */
         if (!endp->receive_msg) {
             endp->receive_msg = net_message_new();
@@ -220,18 +220,18 @@ int net_process_receive(struct net_endpoint *endp)
     return 1;
 }
 
-struct net_message *net_receive(struct net_endpoint *endpoint)
+struct net_message *net_receive(struct net_endpoint *endp)
 {
     struct net_message *msg = NULL;
 
-    if (endpoint->receive_queue_count > 0) {
-        msg = endpoint->receive_queue[0];
+    if (endp->receive_queue_count > 0) {
+        msg = endp->receive_queue[0];
 
         /* Shift the queue. */
         endp->receive_queue_count--;
         if (endp->receive_queue_count > 0) {
             memmove(endp->receive_queue, endp->receive_queue + 1,
-                    endp->receive_count * sizeof(*endp->receive_queue));
+                    endp->receive_queue_count * sizeof(*endp->receive_queue));
         }
     }
 
