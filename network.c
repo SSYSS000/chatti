@@ -75,12 +75,24 @@ void net_message_set_body_length(struct net_message *msg, unsigned len)
     msg->data[1] = len & 0xffu;
 }
 
+
+/**
+ * @brief Resume or begin sending a network message.
+ *
+ * @param endp Endpoint.
+ * @param msg Partially sent network message.
+ * @param num_sent Pointer to the number of bytes sent so far.
+ *                 Value shall be updated before returning.
+ *
+ * @return Zero indicating fully sent message,
+ *         a negative errno value indicating failure.
+ */
 static int net_process_one_send(
         struct net_endpoint *node,
         struct net_message *msg,
         unsigned *num_sent)
 {
-    uint16_t msg_len;
+    unsigned msg_len;
     ssize_t n;
 
     msg_len = net_message_length(msg);
@@ -101,7 +113,7 @@ int net_process_send(struct net_endpoint *endp)
 {
     struct net_message *msg;
     unsigned n_processed;
-    int err;
+    int err = 0;
 
     for (n_processed = 0; n_processed < endp->send_queue_count; ++n_processed) {
         msg = endp->send_queue[n_processed];
@@ -132,12 +144,25 @@ int net_process_send(struct net_endpoint *endp)
     return endpoint->send_queue_count;
 }
 
+/**
+ * @brief Resume or begin receiving a network message.
+ *
+ * @param endp Endpoint.
+ * @param msg Partially received network message.
+ * @param num_received Pointer to the number of bytes received so far.
+ *                     Value shall be updated before returning.
+ *
+ * @return A positive integer indicating a fully received message,
+ *         zero indicating endpoint has shutdown,
+ *         a negative errno value indicating failure.
+ */
 static int net_process_one_receive(
         struct net_endpoint *endp,
         struct net_message *msg,
         unsigned *num_received)
 {
     unsigned needed;
+    ssize_t n;
 
     if (*num_received < NET_MSG_HEADER_LEN) {
         /* Need to receive header first. */
@@ -166,6 +191,7 @@ int net_process_receive(struct net_endpoint *endp)
 {
     /* TODO: Finish this function. */
     struct message *msg;
+    int err = 0;
 
     /* Get receive buffer. */
     msg = endp->receive_msg;
@@ -192,7 +218,7 @@ int net_process_receive(struct net_endpoint *endp)
         return -1;
     }
 
-    return endp->receive_queue_count;
+    return err;
 }
 
 struct net_message *net_receive(struct net_endpoint *endpoint)
