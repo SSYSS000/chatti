@@ -38,4 +38,6 @@ int ui_message_printf(const char *fmt, ...);
  */
 int ui_message_vprintf(const char *fmt, va_list va);
 
+char *ui_get_line(void);
+
 #endif /* UI_H */

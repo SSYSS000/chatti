@@ -29,6 +29,8 @@ int ui_init(void)
 
     initscr();
 
+    echo();
+
     getmaxyx(stdscr, term_y, term_x);
 
     /* Initialise message window. */
@@ -56,15 +58,20 @@ int ui_init(void)
             TEXT_INPUT_NCOLS(term_x), PADDING, PADDING);
     assert(text_input_window);
 
-    wrefresh(message_window_b);
-    wrefresh(text_input_window_b);
+    scrollok(text_input_window, TRUE);
+    nodelay(text_input_window, 1);
+
+    wnoutrefresh(message_window_b);
+    wnoutrefresh(text_input_window_b);
     
     touchwin(message_window_b);
-    wrefresh(message_window);
+    wnoutrefresh(message_window);
 
     touchwin(text_input_window_b);
-    wrefresh(text_input_window);
+    wnoutrefresh(text_input_window);
 
+    doupdate();
+    
     return 0;
 }
 
@@ -76,6 +83,8 @@ void ui_deinit(void)
     delwin(text_input_window_b);
     endwin();
 }
+
+/* Output functions */
 
 int ui_message_printf(const char *fmt, ...)
 {
@@ -100,5 +109,55 @@ int ui_message_vprintf(const char *fmt, va_list va)
     wrefresh(message_window);
     
     return ret == OK ? 0 : -1;
+}
+
+/* Input functions */
+static char input_buf[1024];
+static int input_len;
+
+static void clear_input_window(void)
+{
+    werase(text_input_window);
+}
+
+static void handle_backspace(int c)
+{
+    if (input_len > 0) {
+        input_len--;
+
+        /* Delete last character. */
+        mvwdelch(text_input_window, 0, input_len);
+
+        /* Delete echoed DEL character. */
+        wdelch(text_input_window);
+        wdelch(text_input_window);
+    }
+}
+
+char *ui_get_line(void)
+{
+    char *ret = NULL;
+    int c;
+
+    while(!ret && (c = wgetch(text_input_window)) != ERR) {
+        if (c == KEY_BACKSPACE || c == KEY_DC || c == 127) {
+            handle_backspace(c);
+        }
+        else {
+            input_buf[input_len++] = (unsigned char) c;
+        }
+
+        if (c == '\n') {
+            input_buf[input_len] = 0;
+            input_len = 0;
+            clear_input_window();
+            ret = input_buf;
+        }
+
+        touchwin(text_input_window_b);
+        wrefresh(text_input_window);
+    }
+
+    return ret;
 }
 
