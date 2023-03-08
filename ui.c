@@ -127,11 +127,14 @@ static void handle_backspace(int c)
 
         /* Delete last character. */
         mvwdelch(text_input_window, 0, input_len);
-
-        /* Delete echoed DEL character. */
-        wdelch(text_input_window);
-        wdelch(text_input_window);
     }
+    else {
+        wmove(text_input_window, 0, 0);
+    }
+
+    /* Delete echoed DEL character. */
+    wdelch(text_input_window);
+    wdelch(text_input_window);
 }
 
 char *ui_get_line(void)
