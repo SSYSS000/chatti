@@ -22,6 +22,7 @@ static WINDOW *text_input_window, *text_input_window_b;
 
 int ui_init(void)
 {
+    /* TODO: handle errors. */
     int term_x, term_y;
 
     assert(message_window == NULL);
@@ -63,6 +64,8 @@ int ui_init(void)
 
     touchwin(text_input_window_b);
     wrefresh(text_input_window);
+
+    return 0;
 }
 
 void ui_deinit(void)
