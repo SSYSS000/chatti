@@ -63,7 +63,7 @@ void net_message_unref(struct net_message *msg);
  *
  * @return On success, zero. If body is too long, return -1. 
  */
-int net_message_set_body(struct net_message, const void *body, unsigned len);
+int net_message_set_body(struct net_message *msg, const void *body, unsigned len);
 
 /**
  * @brief Enqueue a network message to be sent to an endpoint.
