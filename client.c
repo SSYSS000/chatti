@@ -13,18 +13,25 @@
 #include "ui.h"
 #include "log.h"
 #include "network.h"
+#include "chat.h"
 
 #define eprintf(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
+
+static char username[CHAT_MEMBER_NAME_MAX_LEN + 1];
 
 static struct net_endpoint *connect_server(const char *addr, const char *port)
 {
     struct net_endpoint *server;
     struct addrinfo *res, *addrinfo;
+    struct addrinfo hints = {0};
     int save_errno;
     int sockfd;
     int err = -1;
 
-    err = getaddrinfo(addr, port, NULL, &res);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    err = getaddrinfo(addr, port, &hints, &res);
     if (err != 0) {
         eprintf("getaddrinfo: %s\n", gai_strerror(err));
         return NULL;
@@ -51,7 +58,7 @@ static struct net_endpoint *connect_server(const char *addr, const char *port)
     freeaddrinfo(res);
 
     if (err == -1) {
-        perror("Unable to connect");
+        perror("Unable to connect to server");
         return NULL;
     }
 
@@ -70,14 +77,73 @@ static void disconnect_server(struct net_endpoint *server)
     net_endpoint_destroy(server);
 }
 
+static int send_chat_message(struct net_endpoint *server, const struct chat_message *chat_msg)
+{
+    struct net_message *net_msg;
+    char buffer[1024];
+    int n, ret = 0;
+
+    buffer[0] = MSG_CHAT_MESSAGE;
+    n = chat_chat_message_to_network(chat_msg, buffer + 1, sizeof(buffer) - 1);
+    if (n == -1) {
+        log_debug("Chat message serialisation buffer too small (%zu).\n",
+                sizeof(buffer)); 
+        return -1;
+    }
+
+    net_msg = net_message_new();
+    if (!net_msg) {
+        return -1;
+    }
+
+    if (net_message_set_body(net_msg, buffer, 1 + n) == -1) {
+        log_debug("Network message body is too long!\n");
+        net_message_unref(net_msg);
+        return -1;
+    }
+
+    if (net_enqueue_message(server, net_msg) == -1) {
+        /* Queue full */
+        ret = -1;
+    }
+
+    net_message_unref(net_msg);
+
+    return ret;
+}
+
 static int handle_user_input(struct net_endpoint *server)
 {
-    char *line; 
-    line = ui_get_line();
+    struct chat_message chat_msg;
+    char *line;
+    int err;
 
-    if (line && line[0] != '\n') {
-        ui_message_printf("%s", line);
+    line = ui_get_line();
+    if (!line) {
+        /* Line not finished yet. */
+        return 0;
     }
+    
+    if (line[0] == '\n') {
+        log_debug("User entered empty message\n");
+        return 0;
+    }
+
+    log_debug("User entered message: %s", line);
+
+    line[strlen(line) - 1] = '\0'; /* Remove '\n'. */
+
+    /* Create a new chat message. */
+    strcpy(chat_msg.sender, username);
+    strncpy(chat_msg.message, line, CHAT_MESSAGE_MAX_LEN);
+    chat_msg.message[CHAT_MESSAGE_MAX_LEN + 1] = '\0';
+
+
+    if (send_chat_message(server, &chat_msg) != 0) {
+        log_error("Failed to send chat message.\n");
+    }
+
+    return 0;
 }
 
 static int handle_server_input(struct net_endpoint *server)
@@ -89,7 +155,7 @@ int main_loop(struct net_endpoint *server)
 {
     struct pollfd fds[] = {
         { .fd = 0,          .events = POLLIN },
-        { .fd = server->fd, .events = POLLIN },
+        { .fd = server->fd, .events = POLLIN | POLLHUP },
     };
     struct pollfd *stdinpoll = &fds[0];
     struct pollfd *serverpoll = &fds[1];
@@ -103,7 +169,7 @@ int main_loop(struct net_endpoint *server)
         }
 
         if (stdinpoll->revents & POLLIN) {
-            err = handle_user_input();
+            err = handle_user_input(server);
             if (err) {
                 return err;
             }
@@ -116,13 +182,31 @@ int main_loop(struct net_endpoint *server)
             }
         }
 
-        if (serverpoll->revents & POLLOUT) {
+        if (serverpoll->revents & POLLHUP) {
+            log_error("disconnected\n");
+        }
 
+        if (server->send_queue_count > 0) {
+            serverpoll->events |= POLLOUT;
+        }
+
+        if (serverpoll->revents & POLLOUT) {
+            int queue_len = net_process_send(server);
+            if (queue_len < 0) {
+                log_error("Unable to send to server: %s\n", strerror(-queue_len));
+            }
+            else if (queue_len == 0) {
+                /* nothing more to send at this time. */
+                serverpoll->events &= ~POLLOUT;
+            }
         }
     }
 
     return 0;
 }
+
+#define server_addr "127.0.0.1"
+#define server_port "14023"
 
 int main(int argc, char *argv[])
 {
@@ -130,12 +214,16 @@ int main(int argc, char *argv[])
 
     setlocale(LC_ALL, "");
 
-    server = connect_server("127.0.0.1", "14023");
+    eprintf("Connecting to %s:%s ...\n", server_addr, server_port);
+    server = connect_server(server_addr, server_port);
     if (!server) {
         return EXIT_FAILURE;
     }
 
     ui_init();
+
+    log_info("You are now connected. Press CTRL+C to disconnect.\n");
+
     main_loop(server);
     ui_deinit();
     disconnect_server(server);
