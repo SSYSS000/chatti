@@ -55,12 +55,15 @@ struct net_message *net_message_ref(struct net_message *msg);
 void net_message_unref(struct net_message *msg);
 
 /**
- * @brief Set the body length of the network message (length without header).
+ * @brief Set a body to the network message by copying it from a buffer.
  *
- * @param msg Network message.
- * @param len Body length.
+ * @param net_message Network message.
+ * @param body Network message body.
+ * @param len Length of body.
+ *
+ * @return On success, zero. If body is too long, return -1. 
  */
-void net_message_set_body_length(struct net_message *msg, unsigned len);
+int net_message_set_body(struct net_message, const void *body, unsigned len);
 
 /**
  * @brief Enqueue a network message to be sent to an endpoint.

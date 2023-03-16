@@ -70,13 +70,29 @@ static unsigned net_message_length(const struct net_message *msg)
     return len;
 }
 
-void net_message_set_body_length(struct net_message *msg, unsigned len)
+/**
+ * @brief Set the body length of the network message (length without header).
+ *
+ * @param msg Network message.
+ * @param len Body length.
+ */
+static void net_message_set_body_length(struct net_message *msg, unsigned len)
 {
     len += NET_MSG_HEADER_LEN;
     msg->data[0] = (len >> 8) & 0xffu;
     msg->data[1] = len & 0xffu;
 }
 
+int net_message_set_body(struct net_message *msg, const void *body, unsigned len)
+{
+    if (NET_MSG_HEADER_LEN + len > NET_MSG_DATA_SIZE) {
+        return -1;
+    }
+
+    net_message_set_body_length(msg, len);
+    memcpy(msg->data + NET_MSG_HEADER_LEN, body, len);
+    return 0;
+}
 
 /**
  * @brief Resume or begin sending a network message.
