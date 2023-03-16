@@ -6,6 +6,7 @@
 
 #include <sys/socket.h>
 
+#include "log.h"
 #include "network.h"
 
 struct net_message *net_message_new(void)
@@ -53,6 +54,7 @@ void net_endpoint_destroy(struct net_endpoint *endpoint)
 int net_enqueue_message(struct net_endpoint *endpoint, struct net_message *msg)
 {
     if (endpoint->send_queue_count == NET_ENDP_SEND_QUEUE_SIZE) {
+        log_debug("Network endpoint send queue is full!\n");
         return -1;
     }
 
