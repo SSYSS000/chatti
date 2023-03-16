@@ -70,7 +70,7 @@ static void disconnect_server(struct net_endpoint *server)
     net_endpoint_destroy(server);
 }
 
-static void handle_user_input()
+static int handle_user_input(struct net_endpoint *server)
 {
     char *line; 
     line = ui_get_line();
@@ -78,6 +78,11 @@ static void handle_user_input()
     if (line && line[0] != '\n') {
         ui_message_printf("%s", line);
     }
+}
+
+static int handle_server_input(struct net_endpoint *server)
+{
+
 }
 
 int main_loop(struct net_endpoint *server)
@@ -88,7 +93,7 @@ int main_loop(struct net_endpoint *server)
     };
     struct pollfd *stdinpoll = &fds[0];
     struct pollfd *serverpoll = &fds[1];
-    int pollret;
+    int pollret, err;
 
     for(;;) {
         pollret = poll(fds, 2, -1);
@@ -98,11 +103,21 @@ int main_loop(struct net_endpoint *server)
         }
 
         if (stdinpoll->revents & POLLIN) {
-            handle_user_input();
+            err = handle_user_input();
+            if (err) {
+                return err;
+            }
         }
 
         if (serverpoll->revents & POLLIN) {
-            // data from server 
+            err = handle_server_input(server);
+            if (err) {
+                return err;
+            }
+        }
+
+        if (serverpoll->revents & POLLOUT) {
+
         }
     }
 
