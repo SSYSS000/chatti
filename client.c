@@ -4,6 +4,8 @@
 #include <locale.h>
 
 #include "ui.h"
+#include "log.h"
+
 
 int main(int argc, char *argv[])
 {
