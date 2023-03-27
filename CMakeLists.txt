@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 project(chatti LANGUAGES C)
 
+
 set(SERVER_TARGET ${PROJECT_NAME}-server)
 set(CLIENT_TARGET ${PROJECT_NAME}-client)
 
@@ -29,3 +30,7 @@ add_executable(${CLIENT_TARGET}
 target_link_libraries(${CLIENT_TARGET} PRIVATE ncurses)
 
 target_compile_definitions(${CLIENT_TARGET} PUBLIC BUILD_TARGET_CLIENT=1)
+
+include(CTest)
+add_subdirectory(test)
+
