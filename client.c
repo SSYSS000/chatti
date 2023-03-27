@@ -146,9 +146,79 @@ static int handle_user_input(struct net_endpoint *server)
     return 0;
 }
 
+static int handle_server_net_message(struct net_endpoint *server, struct net_message *net_msg)
+{
+    unsigned char *data;
+    unsigned length;
+    enum message_type msg_type; 
+
+    length = net_message_body_length(net_msg);
+    
+    if (length < 1) {
+        log_debug("Discarded empty net message.\n");
+        return 0;
+    }
+
+    data = net_message_body(net_msg);
+    
+    msg_type = data[0];
+    data++;
+    length--;
+
+    union {
+        struct chat_message chat;
+        struct chat_member_join join;
+        struct chat_member_leave leave;
+    } msg;
+    int conv;
+
+    switch (msg_type) {
+    case MSG_CHAT_MESSAGE:
+        conv = chat_network_to_chat_message(&msg.chat, data, length);
+        break;
+    case MSG_CHAT_MEMBER_JOIN:
+        conv = chat_network_to_chat_member_join(&msg.join, data, length);
+        break;
+    case MSG_CHAT_MEMBER_LEAVE:
+        conv = chat_network_to_chat_member_leave(&msg.leave, data, length);
+        break;
+    default:
+        log_error("Received corrupted message.\n");
+        log_debug("Corrupted message type is %d\n", (int)msg_type);
+        return -1;
+    }
+
+    if (conv < 0) {
+        log_error("Received corrupted message.\n");
+        log_debug("Failed to convert message from network format.\n");
+        return -1;
+    }
+
+    return 0;
+}
+
 static int handle_server_input(struct net_endpoint *server)
 {
+    struct net_message *msg;
+    int rc;
 
+    rc = net_process_receive(server);
+    if (rc < 0) {
+        log_error("Unable to receive data: %s\n", strerror(-rc));
+        return -1;
+    }
+    else if (rc == 0) {
+        log_info("Server disconnected\n");
+    }
+
+    msg = net_receive(server);
+    if (!msg)
+        return 0;
+
+    rc = handle_server_net_message(server, msg);
+    net_message_unref(msg);
+
+    return rc;
 }
 
 int main_loop(struct net_endpoint *server)
