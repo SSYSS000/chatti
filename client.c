@@ -207,18 +207,18 @@ static int handle_server_input(struct net_endpoint *server)
         log_error("Unable to receive data: %s\n", strerror(-rc));
         return -1;
     }
-    else if (rc == 0) {
-        log_info("Server disconnected\n");
-    }
 
     msg = net_receive(server);
-    if (!msg)
+    if (msg) {
+        net_message_unref(msg);
         return 0;
+    }
 
-    rc = handle_server_net_message(server, msg);
-    net_message_unref(msg);
+    if (rc == 0) {
+        /* Server disconnected. */
+    }
 
-    return rc;
+    return 0;
 }
 
 int main_loop(struct net_endpoint *server)
@@ -295,6 +295,7 @@ int main(int argc, char *argv[])
     log_info("You are now connected. Press CTRL+C to disconnect.\n");
 
     main_loop(server);
+    sleep(1);
     ui_deinit();
     disconnect_server(server);
 
