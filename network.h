@@ -66,6 +66,24 @@ void net_message_unref(struct net_message *msg);
 int net_message_set_body(struct net_message *msg, const void *body, unsigned len);
 
 /**
+ * @brief Get a pointer to the message body.
+ *
+ * @param msg Network message.
+ *
+ * @return Pointer to message body.
+ */
+unsigned char *net_message_body(struct net_message *msg);
+
+/**
+ * @brief Get the length of the message body.
+ *
+ * @param msg Network message.
+ *
+ * @return Message body length.
+ */
+unsigned net_message_body_length(const struct net_message *msg);
+
+/**
  * @brief Enqueue a network message to be sent to an endpoint.
  *
  * @param endpoint Endpoint.
