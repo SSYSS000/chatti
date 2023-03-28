@@ -23,6 +23,12 @@ struct chat_member_leave {
     char sender[CHAT_MEMBER_NAME_MAX_LEN + 1];
 };
 
+union chat_any_message {
+    struct chat_message chat;
+    struct chat_member_join join;
+    struct chat_member_leave leave;
+};
+
 /*
  * These functions convert network formatted data to messages or vice versa.
  * On success, they return the number of bytes read or written to the buffer.

@@ -146,17 +146,26 @@ static int handle_user_input(struct net_endpoint *server)
     return 0;
 }
 
-static int handle_server_net_message(struct net_endpoint *server, struct net_message *net_msg)
+/**
+ * @brief Convert net message to a chat message object.
+ *
+ * @param cm Any chat message object.
+ * @param net_msg Network message.
+ *
+ * @return enum message_type or -1 on conversion error.
+ */
+static int net_message_to_chat_object(union chat_any_message *cm, struct net_message *net_msg)
 {
+    enum message_type msg_type; 
     unsigned char *data;
     unsigned length;
-    enum message_type msg_type; 
+    int conv;
 
     length = net_message_body_length(net_msg);
     
     if (length < 1) {
         log_debug("Discarded empty net message.\n");
-        return 0;
+        return -1;
     }
 
     data = net_message_body(net_msg);
@@ -165,57 +174,83 @@ static int handle_server_net_message(struct net_endpoint *server, struct net_mes
     data++;
     length--;
 
-    union {
-        struct chat_message chat;
-        struct chat_member_join join;
-        struct chat_member_leave leave;
-    } msg;
-    int conv;
-
     switch (msg_type) {
     case MSG_CHAT_MESSAGE:
-        conv = chat_network_to_chat_message(&msg.chat, data, length);
+        conv = chat_network_to_chat_message(&cm->chat, data, length);
         break;
     case MSG_CHAT_MEMBER_JOIN:
-        conv = chat_network_to_chat_member_join(&msg.join, data, length);
+        conv = chat_network_to_chat_member_join(&cm->join, data, length);
         break;
     case MSG_CHAT_MEMBER_LEAVE:
-        conv = chat_network_to_chat_member_leave(&msg.leave, data, length);
+        conv = chat_network_to_chat_member_leave(&cm->leave, data, length);
         break;
     default:
-        log_error("Received corrupted message.\n");
         log_debug("Corrupted message type is %d\n", (int)msg_type);
         return -1;
     }
 
     if (conv < 0) {
-        log_error("Received corrupted message.\n");
         log_debug("Failed to convert message from network format.\n");
         return -1;
     }
 
-    return 0;
+    return msg_type;
+}
+
+static void handle_new_chat_message(const struct chat_message *cm)
+{
+    ui_message_printf("%s: %s\n", cm->sender, cm->message); 
+}
+
+static void handle_new_chat_member_join(const struct chat_member_join *cm)
+{
+    ui_message_printf("%s joined. Say hi!\n", cm->sender);
+}
+
+static void handle_new_chat_member_leave(const struct chat_member_leave *cm)
+{
+    ui_message_printf("%s left.\n", cm->sender);
 }
 
 static int handle_server_input(struct net_endpoint *server)
 {
+    union chat_any_message cm;
     struct net_message *msg;
-    int rc;
+    int process_rc, type;
 
-    rc = net_process_receive(server);
-    if (rc < 0) {
-        log_error("Unable to receive data: %s\n", strerror(-rc));
+    process_rc = net_process_receive(server);
+    if (process_rc < 0) {
+        log_error("Unable to receive data: %s\n", strerror(-process_rc));
         return -1;
     }
 
     msg = net_receive(server);
     if (msg) {
+        type = net_message_to_chat_object(&cm, msg);
         net_message_unref(msg);
-        return 0;
+        msg = NULL;
+    
+        if (type == -1) {
+            log_error("Received corrupted message.\n");
+            return -1;
+        }
+
+        switch ((enum message_type) type) {
+        case MSG_CHAT_MESSAGE:
+            handle_new_chat_message(&cm.chat);
+            break;
+        case MSG_CHAT_MEMBER_JOIN:
+            handle_new_chat_member_join(&cm.join);
+            break;
+        case MSG_CHAT_MEMBER_LEAVE:
+            handle_new_chat_member_leave(&cm.leave);
+            break;
+        }
     }
 
-    if (rc == 0) {
-        /* Server disconnected. */
+    if (process_rc == 0) {
+        log_info("Server disconnected.\n");
+        return -1;
     }
 
     return 0;
@@ -253,7 +288,8 @@ int main_loop(struct net_endpoint *server)
         }
 
         if (serverpoll->revents & POLLHUP) {
-            log_error("disconnected\n");
+            log_info("Server disconnected.\n");
+            return 0;
         }
 
         if (server->send_queue_count > 0) {
