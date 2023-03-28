@@ -260,7 +260,7 @@ int main_loop(struct net_endpoint *server)
 {
     struct pollfd fds[] = {
         { .fd = 0,          .events = POLLIN },
-        { .fd = server->fd, .events = POLLIN | POLLHUP },
+        { .fd = server->fd, .events = POLLIN },
     };
     struct pollfd *stdinpoll = &fds[0];
     struct pollfd *serverpoll = &fds[1];
