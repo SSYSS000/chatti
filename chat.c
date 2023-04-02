@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <string.h>
 
+#include "network.h"
 #include "chat.h"
 
 static int length_of_null_terminated(const char *buf, size_t len)
@@ -117,4 +118,45 @@ int chat_network_to_chat_member_leave(struct chat_member_leave *msg, const void 
     buf_len -= slen + 1;
 
     return save_buf_len - buf_len;
+}
+
+int net_message_to_chat_object(union chat_any_message *cm, struct net_message *net_msg)
+{
+    unsigned char *data;
+    unsigned length;
+    int conv, msg_type;
+
+    data   = net_message_body(net_msg);
+    length = net_message_body_length(net_msg);
+    
+    if (length < 1) {
+        log_debug("Discarded empty net message.\n");
+        return -1;
+    }
+
+    msg_type = data[0];
+    data++;
+    length--;
+
+    switch (msg_type) {
+    case MSG_CHAT_MESSAGE:
+        conv = chat_network_to_chat_message(&cm->chat, data, length);
+        break;
+    case MSG_CHAT_MEMBER_JOIN:
+        conv = chat_network_to_chat_member_join(&cm->join, data, length);
+        break;
+    case MSG_CHAT_MEMBER_LEAVE:
+        conv = chat_network_to_chat_member_leave(&cm->leave, data, length);
+        break;
+    default:
+        log_debug("Corrupted message type is %d\n", msg_type);
+        return -1;
+    }
+
+    if (conv < 0) {
+        log_debug("Failed to convert message from network format.\n");
+        return -1;
+    }
+
+    return msg_type;
 }

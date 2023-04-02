@@ -146,57 +146,6 @@ static int handle_user_input(struct net_endpoint *server)
     return 0;
 }
 
-/**
- * @brief Convert net message to a chat message object.
- *
- * @param cm Any chat message object.
- * @param net_msg Network message.
- *
- * @return enum message_type or -1 on conversion error.
- */
-static int net_message_to_chat_object(union chat_any_message *cm, struct net_message *net_msg)
-{
-    enum message_type msg_type; 
-    unsigned char *data;
-    unsigned length;
-    int conv;
-
-    length = net_message_body_length(net_msg);
-    
-    if (length < 1) {
-        log_debug("Discarded empty net message.\n");
-        return -1;
-    }
-
-    data = net_message_body(net_msg);
-    
-    msg_type = data[0];
-    data++;
-    length--;
-
-    switch (msg_type) {
-    case MSG_CHAT_MESSAGE:
-        conv = chat_network_to_chat_message(&cm->chat, data, length);
-        break;
-    case MSG_CHAT_MEMBER_JOIN:
-        conv = chat_network_to_chat_member_join(&cm->join, data, length);
-        break;
-    case MSG_CHAT_MEMBER_LEAVE:
-        conv = chat_network_to_chat_member_leave(&cm->leave, data, length);
-        break;
-    default:
-        log_debug("Corrupted message type is %d\n", (int)msg_type);
-        return -1;
-    }
-
-    if (conv < 0) {
-        log_debug("Failed to convert message from network format.\n");
-        return -1;
-    }
-
-    return msg_type;
-}
-
 static void handle_new_chat_message(const struct chat_message *cm)
 {
     ui_message_printf("%s: %s\n", cm->sender, cm->message); 
