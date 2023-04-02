@@ -165,42 +165,41 @@ static int handle_server_input(struct net_endpoint *server)
 {
     struct net_message *msg;
     union chat_object cm;
-    int process_rc, type;
+    int rc, type;
 
-    process_rc = net_process_receive(server);
-    if (process_rc < 0) {
-        log_error("Unable to receive data: %s\n", strerror(-process_rc));
+    rc = net_receive(server, &msg);
+    if (rc < 0) {
+        if (errno == EWOULDBLOCK || errno == EAGAIN) {
+            return 0;
+        }
+
+        log_error("Unable to receive data: %s\n", strerror(errno));
         return -1;
     }
-
-    msg = net_receive(server);
-    if (msg) {
-        type = network_to_chat_object(&cm, net_message_body(msg),
-                net_message_body_length(msg));
-        net_message_unref(msg);
-        msg = NULL;
-    
-        if (type == -1) {
-            log_error("Received corrupted message.\n");
-            return -1;
-        }
-
-        switch ((enum chat_object_type) type) {
-        case CHAT_MESSAGE:
-            handle_new_chat_message(&cm.chat);
-            break;
-        case CHAT_MEMBER_JOIN:
-            handle_new_chat_member_join(&cm.join);
-            break;
-        case CHAT_MEMBER_LEAVE:
-            handle_new_chat_member_leave(&cm.leave);
-            break;
-        }
-    }
-
-    if (process_rc == 0) {
+    else if (rc == 0) {
         log_info("Server disconnected.\n");
         return -1;
+    }
+
+    type = network_to_chat_object(&cm, net_message_body(msg),
+            net_message_body_length(msg));
+    net_message_unref(msg);
+
+    if (type == -1) {
+        log_error("Received corrupted message.\n");
+        return -1;
+    }
+
+    switch ((enum chat_object_type) type) {
+    case CHAT_MESSAGE:
+        handle_new_chat_message(&cm.chat);
+        break;
+    case CHAT_MEMBER_JOIN:
+        handle_new_chat_member_join(&cm.join);
+        break;
+    case CHAT_MEMBER_LEAVE:
+        handle_new_chat_member_leave(&cm.leave);
+        break;
     }
 
     return 0;
@@ -249,7 +248,9 @@ int main_loop(struct net_endpoint *server)
         if (serverpoll->revents & POLLOUT) {
             int queue_len = net_process_send(server);
             if (queue_len < 0) {
-                log_error("Unable to send to server: %s\n", strerror(-queue_len));
+                if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                    log_error("Unable to send to server: %s\n", strerror(errno));
+                }
             }
             else if (queue_len == 0) {
                 /* nothing more to send at this time. */

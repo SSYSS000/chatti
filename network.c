@@ -52,10 +52,6 @@ void net_endpoint_destroy(struct net_endpoint *endpoint)
         net_message_unref(endpoint->send_queue[i]);
     }
 
-    for (unsigned i = 0; i < endpoint->receive_queue_count; ++i) {
-        net_message_unref(endpoint->receive_queue[i]);
-    }
-
     if (endpoint->receive_msg)
         net_message_unref(endpoint->receive_msg);
 
@@ -123,8 +119,8 @@ int net_message_set_body(struct net_message *msg, const void *body, unsigned len
  * @param num_sent Pointer to the number of bytes sent so far.
  *                 Value shall be updated before returning.
  *
- * @return Zero indicating fully sent message,
- *         a negative errno value indicating failure.
+ * @return Positive integer indicating fully sent message,
+ *         -1 indicating failure (check errno).
  */
 static int net_process_one_send(
         struct net_endpoint *endp,
@@ -138,14 +134,14 @@ static int net_process_one_send(
 
     while (*num_sent < msg_len) {
         n = send(endp->fd, msg->data + *num_sent, msg_len - *num_sent, 0);
-        if (n <= 0) {
+        if (n < 0) {
             break;
         }
 
         *num_sent += n;
     }
 
-    return n == -1 ? -errno : 0;
+    return n;
 }
 
 int net_process_send(struct net_endpoint *endp)
@@ -156,14 +152,13 @@ int net_process_send(struct net_endpoint *endp)
 
     for (n_processed = 0; n_processed < endp->send_queue_count; ++n_processed) {
         msg = endp->send_queue[n_processed];
-        err = net_process_one_send(endp, msg, &endp->num_bytes_sent);
-
-        if (err == 0) { 
+        if (net_process_one_send(endp, msg, &endp->num_bytes_sent) > 0) {
             /* Message sent fully. */
             net_message_unref(msg);
             endp->num_bytes_sent = 0;
         }
         else {
+            err = errno;
             break;
         }
     }
@@ -175,104 +170,52 @@ int net_process_send(struct net_endpoint *endp)
                 endp->send_queue_count * sizeof(*endp->send_queue));
     }
 
-    if (err < 0 && err != -EWOULDBLOCK && err != -EAGAIN) {
-        /* An error. */
-        return err;
+    if (err) {
+        errno = err;
+        return -1;
     }
 
     return endp->send_queue_count;
 }
 
-/**
- * @brief Resume or begin receiving a network message.
- *
- * @param endp Endpoint.
- * @param msg Partially received network message.
- * @param num_received Pointer to the number of bytes received so far.
- *                     Value shall be updated before returning.
- *
- * @return A positive integer indicating a fully received message,
- *         zero indicating endpoint has shutdown,
- *         a negative errno value indicating failure.
- */
-static int net_process_one_receive(
-        struct net_endpoint *endp,
-        struct net_message *msg,
-        unsigned *num_received)
+int net_receive(struct net_endpoint *endp, struct net_message **msg)
 {
     unsigned needed;
     ssize_t n;
 
-    if (*num_received < NET_MSG_HEADER_LEN) {
+    /* Get receive buffer. */
+    if (!endp->receive_msg) {
+        endp->receive_msg = net_message_new();
+        if (!endp->receive_msg) {
+            return -ENOMEM;
+        }
+    }
+
+    if (endp->num_bytes_received < NET_MSG_HEADER_LEN) {
         /* Need to receive header first. */
         needed = NET_MSG_HEADER_LEN;
     }
     else {
-        needed = net_message_length(msg);
+        needed = net_message_length(endp->receive_msg);
     }
 
-    while (*num_received < needed) {
-        n = recv(endp->fd, &msg->data[*num_received], needed - *num_received, 0);
-        if (n <= 0)
-            break;
+    while (endp->num_bytes_received < needed) {
+        n = recv(endp->fd, endp->receive_msg->data + endp->num_bytes_received,
+                needed - endp->num_bytes_received, 0);
+        if (n <= 0) {
+            return -1;
+        }
 
-        *num_received += n;
-
-        if (*num_received == NET_MSG_HEADER_LEN) {
-            needed = net_message_length(msg);
+        endp->num_bytes_received += n;
+        if (endp->num_bytes_received == NET_MSG_HEADER_LEN) {
+            needed = net_message_length(endp->receive_msg);
         }
     }
 
-    return n == -1 ? -errno : n;
-}
+    /* Message received fully. */
+    *msg = endp->receive_msg;
+    endp->receive_msg = NULL;
+    endp->num_bytes_received = 0;
 
-int net_process_receive(struct net_endpoint *endp)
-{
-    int err = 0;
-
-    while (endp->receive_queue_count < NET_ENDP_RECEIVE_QUEUE_SIZE) {
-        /* Get receive buffer. */
-        if (!endp->receive_msg) {
-            endp->receive_msg = net_message_new();
-
-            if (!endp->receive_msg) {
-                return -ENOMEM;
-            }
-        }
-
-        err = net_process_one_receive(endp, endp->receive_msg,
-                &endp->num_bytes_received);
-        if (err <= 0) {
-            break;
-        }
-
-        /* Message received fully. */
-        endp->receive_queue[endp->receive_queue_count++] = endp->receive_msg;
-        endp->receive_msg = NULL;
-        endp->num_bytes_received = 0;
-    }
-
-    if (err <= 0 && err != -EWOULDBLOCK && err != -EAGAIN) {
-        return err;
-    }
-
-    return 1;
-}
-
-struct net_message *net_receive(struct net_endpoint *endp)
-{
-    struct net_message *msg = NULL;
-
-    if (endp->receive_queue_count > 0) {
-        msg = endp->receive_queue[0];
-
-        /* Shift the queue. */
-        endp->receive_queue_count--;
-        if (endp->receive_queue_count > 0) {
-            memmove(endp->receive_queue, endp->receive_queue + 1,
-                    endp->receive_queue_count * sizeof(*endp->receive_queue));
-        }
-    }
-
-    return msg;
+    return needed;
 }

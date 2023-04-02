@@ -4,8 +4,7 @@
 #define NET_MSG_DATA_SIZE                       2048u
 #define NET_MSG_LEN_DATA_SIZE                   2u
 #define NET_MSG_HEADER_LEN                      NET_MSG_LEN_DATA_SIZE
-#define NET_ENDP_SEND_QUEUE_SIZE                8u
-#define NET_ENDP_RECEIVE_QUEUE_SIZE             8u
+#define NET_ENDP_SEND_QUEUE_SIZE                16u
 
 struct net_message {
     unsigned ref_count;
@@ -18,10 +17,8 @@ struct net_endpoint {
     unsigned num_bytes_sent;
     unsigned num_bytes_received;
     unsigned send_queue_count;
-    unsigned receive_queue_count;
     struct net_message *receive_msg;
     struct net_message *send_queue[NET_ENDP_SEND_QUEUE_SIZE];
-    struct net_message *receive_queue[NET_ENDP_RECEIVE_QUEUE_SIZE];
 };
 
 struct net_endpoint *net_endpoint_new(int fd);
@@ -94,32 +91,28 @@ unsigned net_message_body_length(const struct net_message *msg);
 int net_enqueue_message(struct net_endpoint *endpoint, struct net_message *msg);
 
 /**
- * @brief Send as much queued data as possible to an endpoint without blocking.
+ * @brief Send as much queued data as possible to an endpoint.
  *
  * @param endpoint Endpoint.
  *
- * @return Send queue length or a negative errno if an error occurred.
+ * @return Send queue length or -1 if an error occurred (check errno).
  */
 int net_process_send(struct net_endpoint *endpoint);
 
 /**
- * @brief Receive as much message data as possible to a queue without blocking.
+ * @brief Resume or begin receiving a network message.
+ *
+ * @description Resume or begin receiving a network message. When the message
+ * is complete, it is stored in msg. If an error occurs, errno is set and the
+ * function returns -1. If the peer has shutdown, return 0.
  *
  * @param endpoint Endpoint.
+ * @param msg Pointer to storage for the received message.
  *
- * @return Positive integer indicating success,
- *         zero indicating endpoint has shutdown,
- *         a negative errno value indicating failure.
+ * @return Positive network message length of *msg on success,
+ *         zero indicating peer has shutdown,
+ *         -1 indicating failure (check errno).
  */
-int net_process_receive(struct net_endpoint *endpoint);
-
-/**
- * @brief Get a network message from the receive queue.
- *
- * @param endpoint Endpoint.
- *
- * @return Network message or NULL if queue is empty.
- */
-struct net_message *net_receive(struct net_endpoint *endpoint);
+int net_receive(struct net_endpoint *endpoint, struct net_message **msg);
 
 #endif /* NETWORK_H */
