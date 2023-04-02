@@ -83,8 +83,8 @@ static int send_chat_message(struct net_endpoint *server, const struct chat_mess
     char buffer[1024];
     int n, ret = 0;
 
-    buffer[0] = MSG_CHAT_MESSAGE;
-    n = chat_chat_message_to_network(chat_msg, buffer + 1, sizeof(buffer) - 1);
+    buffer[0] = CHAT_MESSAGE;
+    n = chat_message_to_network(chat_msg, buffer + 1, sizeof(buffer) - 1);
     if (n == -1) {
         log_debug("Chat message serialisation buffer too small (%zu).\n",
                 sizeof(buffer)); 
@@ -163,8 +163,8 @@ static void handle_new_chat_member_leave(const struct chat_member_leave *cm)
 
 static int handle_server_input(struct net_endpoint *server)
 {
-    union chat_any_message cm;
     struct net_message *msg;
+    union chat_object cm;
     int process_rc, type;
 
     process_rc = net_process_receive(server);
@@ -175,7 +175,8 @@ static int handle_server_input(struct net_endpoint *server)
 
     msg = net_receive(server);
     if (msg) {
-        type = net_message_to_chat_object(&cm, msg);
+        type = network_to_chat_object(&cm, net_message_body(msg),
+                net_message_body_length(msg));
         net_message_unref(msg);
         msg = NULL;
     
@@ -184,14 +185,14 @@ static int handle_server_input(struct net_endpoint *server)
             return -1;
         }
 
-        switch ((enum message_type) type) {
-        case MSG_CHAT_MESSAGE:
+        switch ((enum chat_object_type) type) {
+        case CHAT_MESSAGE:
             handle_new_chat_message(&cm.chat);
             break;
-        case MSG_CHAT_MEMBER_JOIN:
+        case CHAT_MEMBER_JOIN:
             handle_new_chat_member_join(&cm.join);
             break;
-        case MSG_CHAT_MEMBER_LEAVE:
+        case CHAT_MEMBER_LEAVE:
             handle_new_chat_member_leave(&cm.leave);
             break;
         }
