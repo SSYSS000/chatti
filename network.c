@@ -48,6 +48,17 @@ struct net_endpoint *net_endpoint_new(int fd)
 
 void net_endpoint_destroy(struct net_endpoint *endpoint)
 {
+    for (unsigned i = 0; i < endpoint->send_queue_count; ++i) {
+        net_message_unref(endpoint->send_queue[i]);
+    }
+
+    for (unsigned i = 0; i < endpoint->receive_queue_count; ++i) {
+        net_message_unref(endpoint->receive_queue[i]);
+    }
+
+    if (endpoint->receive_msg)
+        net_message_unref(endpoint->receive_msg);
+
     free(endpoint);
 }
 
