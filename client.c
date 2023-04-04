@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <locale.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <stdbool.h>
 
 #include <unistd.h>
 #include <poll.h>
@@ -17,7 +19,32 @@
 
 #define eprintf(fmt, ...) fprintf(stderr, fmt, ##__VA_ARGS__)
 
+struct prog_args {
+    const char *addr;
+    const char *port;
+    const char *username;
+} pargs;
+
+static bool should_exit;
 static char username[CHAT_MEMBER_NAME_MAX_LEN + 1];
+
+void scan_arguments(int argc, char *argv[])
+{
+    if (argc < 4) {
+        eprintf("usage: %s server_addr server_port username\n", argv[0]);
+        exit(1);
+    }
+
+    pargs.addr      = argv[1];
+    pargs.port      = argv[2];
+    pargs.username  = argv[3];
+
+    if (strlen(pargs.username) > CHAT_MEMBER_NAME_MAX_LEN) {
+        eprintf("Username %s is too long (max %d chars).\n",
+                (int)CHAT_MEMBER_NAME_MAX_LEN);
+        exit(1);
+    }
+}
 
 static struct net_endpoint *connect_server(const char *addr, const char *port)
 {
@@ -110,6 +137,34 @@ static int send_chat_message(struct net_endpoint *server, const struct chat_mess
     net_message_unref(net_msg);
 
     return ret;
+}
+
+static int join_chat(struct net_endpoint *server)
+{
+    struct chat_member_join join = {0};
+    struct net_message *netmsg;
+    char buffer[1024];
+    int len;
+
+    strcpy(join.sender, username);
+
+    buffer[0] = CHAT_MEMBER_JOIN;
+    len = chat_member_join_to_network(&join, buffer + 1, sizeof(buffer) - 1);
+
+    netmsg = net_message_new();
+    net_message_set_body(netmsg, buffer, len + 1);
+    net_enqueue_message(server, netmsg);
+    net_message_unref(netmsg);
+
+    while ((len = net_process_send(server)) > 0)
+        ;
+    
+    if (len == -1) {
+        perror("Unable to join chat");
+        return -1;
+    }
+
+    return 0;
 }
 
 static int handle_user_input(struct net_endpoint *server)
@@ -215,10 +270,13 @@ int main_loop(struct net_endpoint *server)
     struct pollfd *serverpoll = &fds[1];
     int pollret, err;
 
-    for(;;) {
+    while (!should_exit) {
         pollret = poll(fds, 2, -1);
         if (pollret == -1) {
-            log_error("poll: %s", strerror(errno));
+            if (errno != EINTR) {
+                log_error("poll: %s\n", strerror(errno));
+            }
+
             continue;
         }
 
@@ -234,11 +292,6 @@ int main_loop(struct net_endpoint *server)
             if (err) {
                 return err;
             }
-        }
-
-        if (serverpoll->revents & POLLHUP) {
-            log_info("Server disconnected.\n");
-            return 0;
         }
 
         if (server->send_queue_count > 0) {
@@ -262,8 +315,10 @@ int main_loop(struct net_endpoint *server)
     return 0;
 }
 
-#define server_addr "127.0.0.1"
-#define server_port "14023"
+static void on_exit_signal(int sig)
+{
+    should_exit = true;
+}
 
 int main(int argc, char *argv[])
 {
@@ -271,17 +326,29 @@ int main(int argc, char *argv[])
 
     setlocale(LC_ALL, "");
 
-    eprintf("Connecting to %s:%s ...\n", server_addr, server_port);
-    server = connect_server(server_addr, server_port);
+    scan_arguments(argc, argv);
+    strcpy(username, pargs.username);
+
+    signal(SIGINT, on_exit_signal);
+    signal(SIGTERM, on_exit_signal);
+
+    eprintf("Connecting to %s:%s ...\n", pargs.addr, pargs.port);
+    server = connect_server(pargs.addr, pargs.port);
     if (!server) {
         return EXIT_FAILURE;
     }
 
+    if (join_chat(server) == -1) {
+        eprintf("Failed to join chat.\n");
+        disconnect_server(server);
+        return EXIT_SUCCESS;
+    }
+
     ui_init();
-
     log_info("You are now connected. Press CTRL+C to disconnect.\n");
-
     main_loop(server);
+    log_info("Exiting...\n");
+
     sleep(1);
     ui_deinit();
     disconnect_server(server);

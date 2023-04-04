@@ -187,7 +187,8 @@ int net_receive(struct net_endpoint *endp, struct net_message **msg)
     if (!endp->receive_msg) {
         endp->receive_msg = net_message_new();
         if (!endp->receive_msg) {
-            return -ENOMEM;
+            errno = ENOMEM;
+            return -1;
         }
     }
 
@@ -203,7 +204,7 @@ int net_receive(struct net_endpoint *endp, struct net_message **msg)
         n = recv(endp->fd, endp->receive_msg->data + endp->num_bytes_received,
                 needed - endp->num_bytes_received, 0);
         if (n <= 0) {
-            return -1;
+            return n;
         }
 
         endp->num_bytes_received += n;
