@@ -208,12 +208,16 @@ static void handle_new_chat_message(const struct chat_message *cm)
 
 static void handle_new_chat_member_join(const struct chat_member_join *cm)
 {
+    ui_message_fg(UI_FG_CYAN);
     ui_message_printf("%s joined. Say hi!\n", cm->sender);
+    ui_message_fg(UI_FG_DEFAULT);
 }
 
 static void handle_new_chat_member_leave(const struct chat_member_leave *cm)
 {
+    ui_message_fg(UI_FG_CYAN);
     ui_message_printf("%s left.\n", cm->sender);
+    ui_message_fg(UI_FG_DEFAULT);
 }
 
 static int handle_server_input(struct net_endpoint *server)

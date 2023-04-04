@@ -8,8 +8,26 @@
 
 #ifdef BUILD_TARGET_CLIENT
 # include "ui.h"
+
+# define DEFAULT_COLOR          UI_FG_DEFAULT
+# define ERROR_COLOR            UI_FG_RED
+# define INFO_COLOR             UI_FG_BLUE
+# define DEBUG_COLOR            UI_FG_MAGENTA
+
+#elif defined(BUILD_TARGET_SERVER)
+# define DEFAULT_COLOR          0
+# define ERROR_COLOR            0
+# define INFO_COLOR             0
+# define DEBUG_COLOR            0
 #endif
 
+static void set_print_color(int color)
+{
+#ifdef BUILD_TARGET_CLIENT
+    ui_message_fg(color);
+#elif defined(BUILD_TARGET_SERVER)
+#endif
+}
 
 /**
  * @brief Allocate enough memory and call vsnprintf.
@@ -109,7 +127,9 @@ int log_error(const char *fmt, ...)
     va_list va;
     int ret;
     va_start(va, fmt);
+    set_print_color(ERROR_COLOR);
     ret = log_vmsg("error", fmt, va);
+    set_print_color(DEFAULT_COLOR);
     va_end(va);
     return ret;
 }
@@ -119,7 +139,9 @@ int log_info(const char *fmt, ...)
     va_list va;
     int ret;
     va_start(va, fmt);
+    set_print_color(INFO_COLOR);
     ret = log_vmsg("info", fmt, va);
+    set_print_color(DEFAULT_COLOR);
     va_end(va);
     return ret;
 }
@@ -130,7 +152,9 @@ void log_debug(const char *fmt, ...)
 {
     va_list va;
     va_start(va, fmt);
+    set_print_color(DEBUG_COLOR);
     log_vmsg("debug", fmt, va);
+    set_print_color(DEFAULT_COLOR);
     va_end(va);
 }
 

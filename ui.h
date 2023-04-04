@@ -3,6 +3,13 @@
 
 #include <stdarg.h>
 
+#define UI_FG_DEFAULT               1
+#define UI_FG_RED                   2
+#define UI_FG_BLUE                  3
+#define UI_FG_YELLOW                4
+#define UI_FG_MAGENTA               5
+#define UI_FG_CYAN                  6
+
 /**
  * @brief Initialise the user interface. Required before using ui_* functions.
  *
@@ -37,6 +44,9 @@ int ui_message_printf(const char *fmt, ...);
  * @return 0 on success, negative value on error.
  */
 int ui_message_vprintf(const char *fmt, va_list va);
+
+
+void ui_message_fg(int fgcolor);
 
 char *ui_get_line(void);
 

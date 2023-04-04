@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include "ui.h"
 
+#define UI_BG_DEFAULT_COLOR             COLOR_BLACK
+
 #define PADDING                         1
 
 #define TEXT_INPUT_NLINES               2
@@ -20,6 +22,24 @@
 static WINDOW *message_window, *message_window_b;
 static WINDOW *text_input_window, *text_input_window_b;
 
+static void ui_init_colors(void)
+{
+    if (has_colors() == FALSE) {
+        return;
+    }
+
+    start_color();
+
+    init_pair(UI_FG_DEFAULT, COLOR_WHITE, UI_BG_DEFAULT_COLOR);
+    init_pair(UI_FG_RED, COLOR_RED, UI_BG_DEFAULT_COLOR);
+    init_pair(UI_FG_BLUE, COLOR_BLUE, UI_BG_DEFAULT_COLOR);
+    init_pair(UI_FG_YELLOW, COLOR_YELLOW, UI_BG_DEFAULT_COLOR);
+    init_pair(UI_FG_MAGENTA, COLOR_MAGENTA, UI_BG_DEFAULT_COLOR);
+    init_pair(UI_FG_CYAN, COLOR_CYAN, UI_BG_DEFAULT_COLOR);
+
+    attron(COLOR_PAIR(UI_FG_RED));
+}
+
 int ui_init(void)
 {
     /* TODO: handle errors. */
@@ -28,6 +48,7 @@ int ui_init(void)
     assert(message_window == NULL);
 
     initscr();
+    ui_init_colors();
 
     echo();
 
@@ -82,6 +103,11 @@ void ui_deinit(void)
     delwin(message_window_b);
     delwin(text_input_window_b);
     endwin();
+}
+
+void ui_message_fg(int fgcolor)
+{
+    wattron(message_window, COLOR_PAIR(fgcolor));
 }
 
 /* Output functions */
