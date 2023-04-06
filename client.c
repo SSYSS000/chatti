@@ -353,7 +353,6 @@ int main(int argc, char *argv[])
     main_loop(server);
     log_info("Exiting...\n");
 
-    sleep(1);
     ui_deinit();
     disconnect_server(server);
 
