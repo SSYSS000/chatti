@@ -14,8 +14,11 @@
 #include "network.h"
 #include "chat.h"
 
-#define PORT                                            14023
 #define MAX_NUM_CONNECTIONS                             16
+
+struct arguments {
+    int port;
+} pargs;
 
 struct server {
     int listenfd;
@@ -30,6 +33,19 @@ enum server_code {
     SERVER_DISCONNECT,
     SERVER_OK
 };
+
+static void scan_arguments(int argc, char *argv[])
+{
+    const char *port_str;
+
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s port\n", argv[0]);
+        exit(1);
+    }
+
+    port_str = argv[1];
+    pargs.port = atoi(port_str);
+}
 
 static int init_server(struct server *serv, short port)
 {
@@ -363,7 +379,9 @@ static int loop(struct server *serv)
 
 int main(int argc, char *argv[])
 {
-    if (init_server(&server, PORT) == -1) {
+    scan_arguments(argc, argv);
+
+    if (init_server(&server, pargs.port) == -1) {
         return 1;
     }
 
