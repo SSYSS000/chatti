@@ -6,7 +6,7 @@ project(chatti LANGUAGES C)
 set(SERVER_TARGET ${PROJECT_NAME}-server)
 set(CLIENT_TARGET ${PROJECT_NAME}-client)
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(DEBUG=1)
