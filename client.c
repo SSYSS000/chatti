@@ -191,7 +191,7 @@ static int handle_user_input(struct net_endpoint *server)
     /* Create a new chat message. */
     strcpy(chat_msg.sender, username);
     strncpy(chat_msg.message, line, CHAT_MESSAGE_MAX_LEN);
-    chat_msg.message[CHAT_MESSAGE_MAX_LEN + 1] = '\0';
+    chat_msg.message[CHAT_MESSAGE_MAX_LEN] = '\0';
 
 
     if (send_chat_message(server, &chat_msg) != 0) {
