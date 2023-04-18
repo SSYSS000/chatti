@@ -28,22 +28,24 @@ struct prog_args {
 static bool should_exit;
 static char username[CHAT_MEMBER_NAME_MAX_LEN + 1];
 
-void scan_arguments(int argc, char *argv[])
+int scan_arguments(struct prog_args *pargs, int argc, char *argv[])
 {
     if (argc < 4) {
         eprintf("usage: %s server_addr server_port username\n", argv[0]);
-        exit(1);
+        return -1;
     }
 
-    pargs.addr      = argv[1];
-    pargs.port      = argv[2];
-    pargs.username  = argv[3];
+    pargs->addr      = argv[1];
+    pargs->port      = argv[2];
+    pargs->username  = argv[3];
 
-    if (strlen(pargs.username) > CHAT_MEMBER_NAME_MAX_LEN) {
+    if (strlen(pargs->username) > CHAT_MEMBER_NAME_MAX_LEN) {
         eprintf("Username %s is too long (max %d chars).\n",
                 (int)CHAT_MEMBER_NAME_MAX_LEN);
-        exit(1);
+        return -1;
     }
+
+    return 0;
 }
 
 static struct net_endpoint *connect_server(const char *addr, const char *port)
@@ -330,7 +332,10 @@ int main(int argc, char *argv[])
 
     setlocale(LC_ALL, "");
 
-    scan_arguments(argc, argv);
+    if (scan_arguments(&pargs, argc, argv) != 0) {
+        return 1;
+    }
+
     strcpy(username, pargs.username);
 
     signal(SIGINT, on_exit_signal);
