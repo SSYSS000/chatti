@@ -34,17 +34,19 @@ enum server_code {
     SERVER_OK
 };
 
-static void scan_arguments(int argc, char *argv[])
+static int scan_arguments(struct arguments* pargs, int argc, char *argv[])
 {
     const char *port_str;
 
     if (argc < 2) {
         fprintf(stderr, "usage: %s port\n", argv[0]);
-        exit(1);
+        return -1;
     }
 
     port_str = argv[1];
-    pargs.port = atoi(port_str);
+    pargs->port = atoi(port_str);
+
+    return 0;
 }
 
 static int init_server(struct server *serv, short port)
@@ -379,7 +381,9 @@ static int loop(struct server *serv)
 
 int main(int argc, char *argv[])
 {
-    scan_arguments(argc, argv);
+    if (scan_arguments(&pargs, argc, argv) != 0) {
+        return 1;
+    }
 
     if (init_server(&server, pargs.port) == -1) {
         return 1;
