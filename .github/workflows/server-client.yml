@@ -1,0 +1,19 @@
+name: Chatti Server Client CI
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Generate make buildsystem
+      run: cmake -B build -S .
+    - name: make
+      working-directory: ./build
+      run: make -j$(nproc)
+    - name: Run tests
+      run: ctest
+
