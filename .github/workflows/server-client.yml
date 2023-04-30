@@ -15,5 +15,6 @@ jobs:
       working-directory: ./build
       run: make -j$(nproc)
     - name: Run tests
+      working-directory: ./build
       run: ctest
 
