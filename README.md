@@ -1,5 +1,9 @@
 # chatti
 
+Chatti provides instant messaging in a terminal window using BSD sockets and ncurses. Chatti was a school project.
+
+I do not recommend sending sensitive information with chatti or even trusting any received piece of information since the communication is currently __unencrypted__. With that being said, I disclaim responsibility for any damage caused by the use of my software.
+
 ## Build instructions
 
 You will need CMake 3.0 or higher, a C compiler and make or Ninja or something else.
@@ -37,3 +41,9 @@ Now, assuming the connection was established, you should be able to type and sen
 
 In the build directory, run `ctest`. Make sure you've built the tests first. If you haven't see the build instructions above.
 
+
+## TODO
+
+- Convert text from network character encoding (UTF-8) to local character encoding and vice versa.
+- Fix deletion of multibyte characters in the message input window.
+- Much more.
