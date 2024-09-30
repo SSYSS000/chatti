@@ -16,7 +16,7 @@ foreach(file ${files})
     
     add_executable(${target} ${file})
     
-    target_link_libraries(${target} PRIVATE ${MODULES} ncurses)
+    target_link_libraries(${target} PRIVATE ${MODULES} ${CURSES_LIBRARY})
     
     target_compile_definitions(${target} PUBLIC BUILD_TARGET_SERVER=1)
     

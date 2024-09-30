@@ -1,4 +1,7 @@
+#define NCURSES_WIDECHAR 1
 #include <assert.h>
+#include <stdlib.h>
+#include <wchar.h>
 #include <ncurses.h>
 #include <stdarg.h>
 #include "ui.h"
@@ -50,7 +53,7 @@ int ui_init(void)
     initscr();
     ui_init_colors();
 
-    echo();
+    noecho();
 
     getmaxyx(stdscr, term_y, term_x);
 
@@ -138,55 +141,81 @@ int ui_message_vprintf(const char *fmt, va_list va)
 }
 
 /* Input functions */
-static char input_buf[1024];
+enum { INPUT_BUF_SIZE = 256 };
+static wchar_t input_buf[INPUT_BUF_SIZE];
 static int input_len;
 
-static void clear_input_window(void)
+static char *mb_from_wcstring(const wchar_t *wcstring)
 {
-    werase(text_input_window);
-}
+    char *mb_string;
+    size_t mb_size;
 
-static void handle_backspace(int c)
-{
-    if (input_len > 0) {
-        input_len--;
-
-        /* Delete last character. */
-        mvwdelch(text_input_window, 0, input_len);
+    /* Find the length of the multibyte string. */
+    mb_size = wcstombs(NULL, wcstring, 0);
+    if (mb_size == (size_t)-1) {
+        return NULL;
     }
-    else {
-        wmove(text_input_window, 0, 0);
+    mb_size += 1; /* Include null terminator. */
+
+    mb_string = malloc(mb_size);
+    if (mb_string == NULL) {
+        return NULL;
     }
 
-    /* Delete echoed DEL character. */
-    wdelch(text_input_window);
-    wdelch(text_input_window);
+    if (wcstombs(mb_string, wcstring, mb_size) == (size_t)-1) {
+        free(mb_string);
+        return NULL;
+    }
+
+    return mb_string;
 }
 
 char *ui_get_line(void)
 {
-    char *ret = NULL;
-    int c;
+    wint_t c = 0;
+    int status;
 
-    while(!ret && (c = wgetch(text_input_window)) != ERR) {
-        if (c == KEY_BACKSPACE || c == KEY_DC || c == 127) {
-            handle_backspace(c);
+    while (c != L'\n') {
+        status = wget_wch(text_input_window, &c);
+        if (status == ERR) {
+            /* Stop waiting for input. */
+            return NULL;
+        }
+
+        int is_backspace =
+            status == KEY_CODE_YES &&
+            (c == KEY_BACKSPACE || c == KEY_DC) ||
+            c == 127; /* For macOS. */
+
+        if (is_backspace) {
+            /* Remove last input character.  */
+            if (input_len > 0) {
+                input_len--;
+            }
+        }
+        else if (status == KEY_CODE_YES) {}
+        else if (c == L'\n') {
+            /* Enter received; line is complete. */
+            input_buf[input_len] = L'\0'; 
+            input_len = 0; /* Reset length for the next input line. */
+        }
+        else if (input_len + 1 < INPUT_BUF_SIZE) {
+            /* Add character to the input buffer. */
+            input_buf[input_len++] = c;
         }
         else {
-            input_buf[input_len++] = (unsigned char) c;
+            /* Buffer full. */
+            beep();
         }
 
-        if (c == '\n') {
-            input_buf[input_len] = 0;
-            input_len = 0;
-            clear_input_window();
-            ret = input_buf;
-        }
-
+        /* Sync text input window. */
+        werase(text_input_window);
+        waddnwstr(text_input_window, input_buf, input_len);
         touchwin(text_input_window_b);
         wrefresh(text_input_window);
     }
 
-    return ret;
+    /* Convert to multibyte string and return it. */
+    return mb_from_wcstring(input_buf);
 }
 

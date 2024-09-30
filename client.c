@@ -176,25 +176,22 @@ static int handle_user_input(struct net_endpoint *server)
     int err;
 
     line = ui_get_line();
-    if (!line) {
-        /* Line not finished yet. */
+    if (line == NULL) {
         return 0;
     }
     
-    if (line[0] == '\n') {
+    if (line[0] == '\0') {
         log_debug("User entered empty message\n");
         return 0;
     }
 
     log_debug("User entered message: %s", line);
 
-    line[strlen(line) - 1] = '\0'; /* Remove '\n'. */
-
     /* Create a new chat message. */
     strcpy(chat_msg.sender, username);
     strncpy(chat_msg.message, line, CHAT_MESSAGE_MAX_LEN);
     chat_msg.message[CHAT_MESSAGE_MAX_LEN] = '\0';
-
+    free(line);
 
     if (send_chat_message(server, &chat_msg) != 0) {
         log_error("Failed to send chat message.\n");
