@@ -52,23 +52,31 @@ static int scan_arguments(struct arguments* pargs, int argc, char *argv[])
 
 static int init_server(struct server *serv, short port)
 {
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_addr.s_addr = INADDR_ANY,
-        .sin_port = htons(port)
+    struct sockaddr_in6 addr = {
+        .sin6_family = AF_INET6,
+        .sin6_addr = IN6ADDR_ANY_INIT,
+        .sin6_port = htons(port),
     };
+    const int yes = 1;
+    const int no = 0;
 
     memset(serv, 0, sizeof(*serv));
 
-    serv->listenfd = socket(AF_INET, SOCK_STREAM, 0);
+    serv->listenfd = socket(AF_INET6, SOCK_STREAM, 0);
     if (serv->listenfd == -1) {
         log_error("socket: %s\n", strerror(errno));
         return -1;
     }
 
     if (setsockopt(serv->listenfd, SOL_SOCKET, SO_REUSEADDR,
-                &(int){1}, sizeof(int)) < 0) {
-        log_error("setsockopt: %s\n", strerror(errno));
+        &yes, sizeof(yes)) < 0) {
+        log_error("setsockopt: Cannot reuse address: %s\n", strerror(errno));
+    }
+
+    if (setsockopt(serv->listenfd, IPPROTO_IPV6, IPV6_V6ONLY,
+        &no, sizeof(no)) < 0) {
+        log_error("setsockopt: Cannot disable IPV6_V6ONLY: %s\n",
+                  strerror(errno));
     }
 
     if (bind(serv->listenfd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
